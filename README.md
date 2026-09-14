@@ -47,7 +47,8 @@ No GitHub Actions workflow or build command is required.
 ## Mobile browser limitations
 
 - Audio can start only after the user taps **ENTRAR**. The page creates and resumes its `AudioContext` inside that tap handler.
-- iPhone Safari may not allow a normal webpage to enter true fullscreen. The page still fills the available viewport and uses safe-area insets. Safari also has known Web Audio interruption/resume edge cases, especially when a page is installed to the Home Screen; test first in a normal Safari tab.
+- iPhone Safari may not allow a normal webpage to enter true fullscreen. The page still fills the available viewport and uses safe-area insets. On iOS 17 and later the prototype requests the `playback` audio-session type so Web Audio remains audible with the Ring/Silent switch engaged. Older iOS versions receive a generated near-silent media-element fallback; no external sound file is loaded.
+- Safari also has known Web Audio interruption/resume edge cases, especially when a page is installed to the Home Screen; test first in a normal Safari tab.
 - Locking the screen, changing apps, Low Power Mode, or browser memory pressure can suspend audio and slow animation. The page attempts to resume previously unlocked audio when it becomes visible again, but some Safari sessions may require another tap (the mute control can provide it).
 - Phone speakers differ greatly. Their automatic gain control, frequency response, stereo layout, volume setting, and case position will change the balance. Avoid maximum volume.
 - Browser timers can be throttled when a tab is backgrounded. Keep the page visible during pulse tests.

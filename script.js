@@ -60,6 +60,9 @@
     pulseTimer: null,
     timbreTimer: null,
     currentPulseWidth: pulseWidthBase,
+    audioSessionMode: "default",
+    mediaUnlock: null,
+    mediaUnlockUrl: null,
     startedAt: 0,
     muted: false,
     active: false,
@@ -83,6 +86,7 @@
     waveform: document.querySelector("#debug-waveform"),
     width: document.querySelector("#debug-width"),
     filter: document.querySelector("#debug-filter"),
+    session: document.querySelector("#debug-session"),
     detune: document.querySelector("#debug-detune"),
     modulation: document.querySelector("#debug-modulation"),
     state: document.querySelector("#debug-state"),
@@ -104,6 +108,81 @@
     }
 
     return context.createPeriodicWave(real, imaginary);
+  };
+
+  const isIOS = () => {
+    const classicIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const modernIPad = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+    return classicIOS || modernIPad;
+  };
+
+  const createNearSilentWavUrl = () => {
+    const sampleRate = 8000;
+    const sampleCount = 3200;
+    const buffer = new ArrayBuffer(44 + sampleCount * 2);
+    const view = new DataView(buffer);
+    const writeText = (offset, text) => {
+      for (let index = 0; index < text.length; index += 1) {
+        view.setUint8(offset + index, text.charCodeAt(index));
+      }
+    };
+
+    writeText(0, "RIFF");
+    view.setUint32(4, 36 + sampleCount * 2, true);
+    writeText(8, "WAVE");
+    writeText(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeText(36, "data");
+    view.setUint32(40, sampleCount * 2, true);
+
+    // One least-significant bit prevents silence optimization while remaining inaudible.
+    for (let sample = 0; sample < sampleCount; sample += 1) {
+      view.setInt16(44 + sample * 2, sample % 251 === 0 ? 1 : 0, true);
+    }
+
+    return URL.createObjectURL(new Blob([buffer], { type: "audio/wav" }));
+  };
+
+  const startIOSMediaFallback = () => {
+    const audio = document.createElement("audio");
+    const url = createNearSilentWavUrl();
+    audio.src = url;
+    audio.loop = true;
+    audio.preload = "auto";
+    audio.setAttribute("playsinline", "");
+    audio.setAttribute("aria-hidden", "true");
+    audio.hidden = true;
+    document.body.appendChild(audio);
+    state.mediaUnlock = audio;
+    state.mediaUnlockUrl = url;
+    state.audioSessionMode = "media fallback";
+
+    const playResult = audio.play();
+    if (playResult && typeof playResult.catch === "function") {
+      playResult.catch(() => { state.audioSessionMode = "fallback blocked"; });
+    }
+  };
+
+  const configureIOSAudioSession = () => {
+    if (!isIOS()) return;
+
+    if (navigator.audioSession && "type" in navigator.audioSession) {
+      try {
+        navigator.audioSession.type = "playback";
+        state.audioSessionMode = "playback";
+        return;
+      } catch (_) {
+        // Older or restricted WebKit builds fall through to the media element path.
+      }
+    }
+
+    startIOSMediaFallback();
   };
 
   const startPulseWidthMotion = (context, oscillator) => {
@@ -208,7 +287,7 @@
     const amplitudeLfo = context.createOscillator();
     const amplitudeDepth = context.createGain();
 
-    master.gain.value = 0.0001;
+    master.gain.value = 0;
     bandpass.type = "bandpass";
     bandpass.frequency.value = filterCenter;
     bandpass.Q.value = 0.52;
@@ -285,6 +364,7 @@
     }
 
     try {
+      configureIOSAudioSession();
       const context = new AudioContextClass();
       state.context = context;
       context.addEventListener("statechange", updateDebug);
@@ -314,8 +394,8 @@
 
       const now = context.currentTime;
       state.master.gain.cancelScheduledValues(now);
-      state.master.gain.setValueAtTime(0.0001, now);
-      state.master.gain.exponentialRampToValueAtTime(0.82, now + (mode === "pulse" ? 1.2 : 9));
+      state.master.gain.setValueAtTime(0, now);
+      state.master.gain.linearRampToValueAtTime(0.82, now + (mode === "pulse" ? 0.8 : 4.5));
 
       if (mode === "pulse") {
         state.pulseTimer = window.setTimeout(schedulePulse, initialPulseDelay * 1000);
@@ -337,6 +417,15 @@
       try { source.stop(); } catch (_) { /* Already stopped. */ }
     }
     state.sources = [];
+    if (state.mediaUnlock) {
+      state.mediaUnlock.pause();
+      state.mediaUnlock.remove();
+      state.mediaUnlock = null;
+    }
+    if (state.mediaUnlockUrl) {
+      URL.revokeObjectURL(state.mediaUnlockUrl);
+      state.mediaUnlockUrl = null;
+    }
     if (state.context && state.context.state !== "closed") state.context.close().catch(() => {});
     state.context = null;
     state.master = null;
@@ -377,6 +466,7 @@
     debugFields.waveform.textContent = timbre.name;
     debugFields.width.textContent = timbre.name === "pulse" ? `${(state.currentPulseWidth * 100).toFixed(1)}%` : "—";
     debugFields.filter.textContent = `${filterCenter.toFixed(0)} Hz · ${filterRate.toFixed(3)} Hz`;
+    debugFields.session.textContent = state.audioSessionMode;
     debugFields.detune.textContent = `${detune >= 0 ? "+" : ""}${detune.toFixed(2)} cents`;
     debugFields.modulation.textContent = `${modulationRate.toFixed(3)} Hz`;
     debugFields.state.textContent = state.context ? state.context.state : "not created";
