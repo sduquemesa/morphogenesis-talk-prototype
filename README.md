@@ -47,8 +47,8 @@ No GitHub Actions workflow or build command is required.
 ## Mobile browser limitations
 
 - Audio can start only after the user taps **ENTRAR**. The page creates and resumes its `AudioContext` inside that tap handler.
-- iPhone Safari may not allow a normal webpage to enter true fullscreen. The page still fills the available viewport and uses safe-area insets; installing it to the Home Screen can provide a more fullscreen-like presentation.
-- Locking the screen, changing apps, Low Power Mode, or browser memory pressure can suspend audio and slow animation. The page attempts to resume previously unlocked audio when it becomes visible again, but some browsers may require another tap (the mute control can provide it).
+- iPhone Safari may not allow a normal webpage to enter true fullscreen. The page still fills the available viewport and uses safe-area insets. Safari also has known Web Audio interruption/resume edge cases, especially when a page is installed to the Home Screen; test first in a normal Safari tab.
+- Locking the screen, changing apps, Low Power Mode, or browser memory pressure can suspend audio and slow animation. The page attempts to resume previously unlocked audio when it becomes visible again, but some Safari sessions may require another tap (the mute control can provide it).
 - Phone speakers differ greatly. Their automatic gain control, frequency response, stereo layout, volume setting, and case position will change the balance. Avoid maximum volume.
 - Browser timers can be throttled when a tab is backgrounded. Keep the page visible during pulse tests.
 - The page requests no microphone, camera, location, Bluetooth, motion, or notification permissions.
@@ -61,7 +61,7 @@ The fixed collection is **C Lydian dominant**:
 
 Every session chooses one pitch class and one register. C, E, F#, G, and Bb are weighted more heavily so a group tends to assemble the root, major third, #11, fifth, and minor seventh of a suspended dominant field. D and A occur less often as color tones. Registers span octaves 3–5, with octave 4 favored so small phone speakers remain useful.
 
-Each pitch receives a small random detuning. The timbre is a sine or quiet triangle with an extremely soft sine overtone, low-pass filtering, very slow amplitude modulation, subtle pitch drift, and a gentle fade-in. One phone should sound partial; several phones supply harmonic density, beating, and spatial distribution.
+Each pitch receives a small random detuning. The primary oscillator is weighted toward triangle but may instead be a restrained saw, square, or custom pulse wave. Pulse-wave sessions slowly change duty cycle. An extremely soft sine overtone adds depth. A broad, slowly moving band-pass and a final low-pass reduce weak phone-speaker lows and tame tiring high frequencies. Very slow amplitude modulation, subtle pitch drift, and a gentle fade-in keep the sound in motion. One phone should sound partial; several phones supply harmonic density, beating, and spatial distribution.
 
 The pitch choice also influences hue. Loudness, modulation phase, and independent random values influence luminosity and the positions/timing of the slow gradient fields.
 

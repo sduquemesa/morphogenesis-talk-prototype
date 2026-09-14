@@ -20,6 +20,12 @@
     { octave: 4, offset: 0, weight: 4.0 },
     { octave: 5, offset: 12, weight: 1.7 }
   ];
+  const timbres = [
+    { name: "triangle", type: "triangle", level: 0.88, weight: 3.6 },
+    { name: "saw", type: "sawtooth", level: 0.48, weight: 1.7 },
+    { name: "square", type: "square", level: 0.48, weight: 1.5 },
+    { name: "pulse", type: "custom", level: 0.44, weight: 2.4 }
+  ];
 
   const chooseWeighted = (items) => {
     let cursor = Math.random() * items.reduce((sum, item) => sum + item.weight, 0);
@@ -33,11 +39,15 @@
   const randomBetween = (minimum, maximum) => minimum + Math.random() * (maximum - minimum);
   const pitch = chooseWeighted(pitchClasses);
   const register = chooseWeighted(registers);
+  const timbre = chooseWeighted(timbres);
   const detune = randomBetween(-4.2, 4.2);
   const midi = 60 + pitch.semitones + register.offset;
   const frequency = 440 * 2 ** ((midi - 69) / 12);
   const modulationRate = randomBetween(0.018, 0.055);
-  const amplitude = randomBetween(0.025, 0.045);
+  const amplitude = randomBetween(0.034, 0.058);
+  const filterCenter = Math.min(1120, Math.max(520, frequency * randomBetween(1.9, 2.55)));
+  const filterRate = randomBetween(0.006, 0.016);
+  const pulseWidthBase = randomBetween(0.26, 0.44);
   const pulseInterval = randomBetween(3.8, 7.2);
   const pulseDuration = randomBetween(0.72, 1.45);
   const initialPulseDelay = randomBetween(0.12, pulseInterval);
@@ -48,6 +58,8 @@
     master: null,
     sources: [],
     pulseTimer: null,
+    timbreTimer: null,
+    currentPulseWidth: pulseWidthBase,
     startedAt: 0,
     muted: false,
     active: false,
@@ -68,6 +80,9 @@
     note: document.querySelector("#debug-note"),
     frequency: document.querySelector("#debug-frequency"),
     register: document.querySelector("#debug-register"),
+    waveform: document.querySelector("#debug-waveform"),
+    width: document.querySelector("#debug-width"),
+    filter: document.querySelector("#debug-filter"),
     detune: document.querySelector("#debug-detune"),
     modulation: document.querySelector("#debug-modulation"),
     state: document.querySelector("#debug-state"),
@@ -75,6 +90,36 @@
     elapsed: document.querySelector("#debug-elapsed"),
     mode: document.querySelector("#debug-mode"),
     agent: document.querySelector("#debug-agent")
+  };
+
+  const createPulseWave = (context, width) => {
+    const harmonics = 24;
+    const real = new Float32Array(harmonics + 1);
+    const imaginary = new Float32Array(harmonics + 1);
+
+    for (let harmonic = 1; harmonic <= harmonics; harmonic += 1) {
+      const angle = 2 * Math.PI * harmonic * width;
+      real[harmonic] = (2 * Math.sin(angle)) / (Math.PI * harmonic);
+      imaginary[harmonic] = (2 * (1 - Math.cos(angle))) / (Math.PI * harmonic);
+    }
+
+    return context.createPeriodicWave(real, imaginary);
+  };
+
+  const startPulseWidthMotion = (context, oscillator) => {
+    const startedAt = performance.now();
+    const widthRange = randomBetween(0.055, 0.095);
+    const widthPeriod = randomBetween(41, 83);
+
+    const updateWave = () => {
+      const elapsed = (performance.now() - startedAt) / 1000;
+      const width = pulseWidthBase + Math.sin((elapsed / widthPeriod) * Math.PI * 2) * widthRange;
+      state.currentPulseWidth = Math.min(0.48, Math.max(0.18, width));
+      oscillator.setPeriodicWave(createPulseWave(context, state.currentPulseWidth));
+    };
+
+    updateWave();
+    state.timbreTimer = window.setInterval(updateWave, 1800);
   };
 
   const applyVisualIdentity = () => {
@@ -93,14 +138,21 @@
   const createOscillatorVoice = (context, destination) => {
     const voiceMix = context.createGain();
     const primary = context.createOscillator();
+    const primaryGain = context.createGain();
     const overtone = context.createOscillator();
     const overtoneGain = context.createGain();
     const drift = context.createOscillator();
     const driftDepth = context.createGain();
 
-    primary.type = Math.random() < 0.7 ? "sine" : "triangle";
     primary.frequency.value = frequency;
     primary.detune.value = detune;
+    primaryGain.gain.value = timbre.level;
+
+    if (timbre.type === "custom") {
+      startPulseWidthMotion(context, primary);
+    } else {
+      primary.type = timbre.type;
+    }
 
     overtone.type = "sine";
     overtone.frequency.value = frequency * 2;
@@ -111,7 +163,7 @@
     drift.frequency.value = randomBetween(0.009, 0.026);
     driftDepth.gain.value = randomBetween(0.45, 1.4);
 
-    primary.connect(voiceMix);
+    primary.connect(primaryGain).connect(voiceMix);
     overtone.connect(overtoneGain).connect(voiceMix);
     drift.connect(driftDepth);
     driftDepth.connect(primary.detune);
@@ -121,7 +173,7 @@
     const now = context.currentTime;
     primary.start(now);
     overtone.start(now);
-    drift.start(now, randomBetween(0, 1));
+    drift.start(now);
     state.sources.push(primary, overtone, drift);
   };
 
@@ -149,13 +201,22 @@
   const buildAudioGraph = (context) => {
     const master = context.createGain();
     const safetyFilter = context.createBiquadFilter();
+    const bandpass = context.createBiquadFilter();
+    const filterLfo = context.createOscillator();
+    const filterDepth = context.createGain();
     const modulation = context.createGain();
     const amplitudeLfo = context.createOscillator();
     const amplitudeDepth = context.createGain();
 
     master.gain.value = 0.0001;
+    bandpass.type = "bandpass";
+    bandpass.frequency.value = filterCenter;
+    bandpass.Q.value = 0.52;
+    filterLfo.type = "sine";
+    filterLfo.frequency.value = filterRate;
+    filterDepth.gain.value = randomBetween(180, 310);
     safetyFilter.type = "lowpass";
-    safetyFilter.frequency.value = 3200;
+    safetyFilter.frequency.value = 2700;
     safetyFilter.Q.value = 0.18;
     modulation.gain.value = 0.88;
     amplitudeLfo.type = "sine";
@@ -163,9 +224,11 @@
     amplitudeDepth.gain.value = 0.12;
 
     amplitudeLfo.connect(amplitudeDepth).connect(modulation.gain);
-    modulation.connect(safetyFilter).connect(master).connect(context.destination);
-    amplitudeLfo.start(context.currentTime, randomBetween(0, 2));
-    state.sources.push(amplitudeLfo);
+    filterLfo.connect(filterDepth).connect(bandpass.detune);
+    modulation.connect(bandpass).connect(safetyFilter).connect(master).connect(context.destination);
+    amplitudeLfo.start(context.currentTime);
+    filterLfo.start(context.currentTime);
+    state.sources.push(amplitudeLfo, filterLfo);
     state.master = master;
 
     if (mode === "pulse") {
@@ -180,6 +243,23 @@
       voiceLevel.connect(modulation);
       createOscillatorVoice(context, voiceLevel);
     }
+  };
+
+  const unlockAudioContext = (context) => {
+    // Starting a silent buffer inside the click improves WebKit's first-play reliability.
+    const buffer = context.createBuffer(1, 1, context.sampleRate);
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(context.destination);
+    source.start(0);
+  };
+
+  const waitForRunning = async (context, timeout = 2800) => {
+    const deadline = performance.now() + timeout;
+    while (context.state !== "running" && performance.now() < deadline) {
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+    }
+    return context.state === "running";
   };
 
   const requestFullscreen = () => {
@@ -198,7 +278,6 @@
   const start = async () => {
     if (state.active) return;
     elements.error.hidden = true;
-    requestFullscreen();
 
     if (!AudioContextClass) {
       showError("Web Audio is not supported by this browser. Try a recent version of Safari or Chrome.");
@@ -206,13 +285,21 @@
     }
 
     try {
-      const context = new AudioContextClass({ latencyHint: "playback" });
+      const context = new AudioContextClass();
       state.context = context;
+      context.addEventListener("statechange", updateDebug);
+      unlockAudioContext(context);
       buildAudioGraph(context);
-      await context.resume();
+      let resumeError = null;
+      const resumeResult = context.resume();
+      if (resumeResult && typeof resumeResult.catch === "function") {
+        resumeResult.catch((error) => { resumeError = error; });
+      }
+      // Audio gets the gesture first; fullscreen remains a best-effort enhancement.
+      requestFullscreen();
 
-      if (context.state !== "running") {
-        throw new Error(`AudioContext remained ${context.state}`);
+      if (!(await waitForRunning(context))) {
+        throw resumeError || new Error(`AudioContext remained ${context.state}`);
       }
 
       state.active = true;
@@ -243,7 +330,9 @@
   const cleanupAudio = () => {
     state.active = false;
     if (state.pulseTimer) window.clearTimeout(state.pulseTimer);
+    if (state.timbreTimer) window.clearInterval(state.timbreTimer);
     state.pulseTimer = null;
+    state.timbreTimer = null;
     for (const source of state.sources) {
       try { source.stop(); } catch (_) { /* Already stopped. */ }
     }
@@ -285,6 +374,9 @@
     debugFields.note.textContent = `${pitch.name}${register.octave}`;
     debugFields.frequency.textContent = `${frequency.toFixed(2)} Hz`;
     debugFields.register.textContent = `octave ${register.octave}`;
+    debugFields.waveform.textContent = timbre.name;
+    debugFields.width.textContent = timbre.name === "pulse" ? `${(state.currentPulseWidth * 100).toFixed(1)}%` : "—";
+    debugFields.filter.textContent = `${filterCenter.toFixed(0)} Hz · ${filterRate.toFixed(3)} Hz`;
     debugFields.detune.textContent = `${detune >= 0 ? "+" : ""}${detune.toFixed(2)} cents`;
     debugFields.modulation.textContent = `${modulationRate.toFixed(3)} Hz`;
     debugFields.state.textContent = state.context ? state.context.state : "not created";
@@ -308,17 +400,23 @@
   };
 
   const recoverAudio = () => {
-    if (document.visibilityState === "visible" && state.active && !state.muted && state.context?.state === "suspended") {
-      state.context.resume().catch(() => {});
+    if (document.visibilityState === "visible" && state.active && !state.muted && state.context && state.context.state !== "running" && state.context.state !== "closed") {
+      const resumeResult = state.context.resume();
+      if (resumeResult && typeof resumeResult.catch === "function") resumeResult.catch(() => {});
     }
     updateDebug();
   };
 
   applyVisualIdentity();
   elements.enter.addEventListener("click", start);
-  elements.mute.addEventListener("click", () => { toggleMute().catch(() => {}); });
+  elements.mute.addEventListener("click", () => {
+    toggleMute().catch((error) => {
+      showError(`Audio could not resume (${error.message || "unknown error"}). Tap UNMUTE to try again.`);
+    });
+  });
   elements.debugToggle.addEventListener("click", toggleDebug);
   document.addEventListener("visibilitychange", recoverAudio);
   window.addEventListener("pageshow", recoverAudio);
+  window.addEventListener("focus", recoverAudio);
   window.addEventListener("resize", updateDebug, { passive: true });
 })();

@@ -89,18 +89,18 @@ button {
 }
 
 .field.is-active::before {
-  opacity: 0.72;
-  animation: drift-a 97s ease-in-out var(--phase) infinite alternate;
+  opacity: 0.78;
+  animation: drift-a 83s ease-in-out var(--phase) infinite alternate;
 }
 
 .field.is-active::after {
-  opacity: 0.62;
-  animation: drift-b 131s ease-in-out var(--phase-alt) infinite alternate;
+  opacity: 0.68;
+  animation: drift-b 127s ease-in-out var(--phase-alt) infinite alternate;
 }
 
 .field.is-active .field__veil {
-  opacity: 0.75;
-  animation: breathe 73s ease-in-out var(--phase-veil) infinite alternate;
+  opacity: 0.8;
+  animation: breathe 61s ease-in-out var(--phase-veil) infinite alternate;
 }
 
 .enter {
@@ -246,20 +246,20 @@ button {
 
 @keyframes drift-a {
   0% { transform: translate3d(-3%, -2%, 0) scale(0.94); }
-  38% { transform: translate3d(9%, 5%, 0) scale(1.03); }
-  100% { transform: translate3d(4%, 13%, 0) scale(0.98); }
+  38% { transform: translate3d(12%, 7%, 0) scale(1.04); }
+  100% { transform: translate3d(5%, 17%, 0) scale(0.97); }
 }
 
 @keyframes drift-b {
   0% { transform: translate3d(2%, 3%, 0) scale(1.02); }
-  46% { transform: translate3d(-11%, -4%, 0) scale(0.94); }
-  100% { transform: translate3d(-5%, -13%, 0) scale(1.06); }
+  46% { transform: translate3d(-14%, -6%, 0) scale(0.93); }
+  100% { transform: translate3d(-7%, -17%, 0) scale(1.07); }
 }
 
 @keyframes breathe {
   0% { transform: rotate(-4deg) scale(1.05) translate3d(-2%, 1%, 0); opacity: 0.58; }
-  53% { transform: rotate(3deg) scale(1.12) translate3d(2%, -2%, 0); opacity: 0.8; }
-  100% { transform: rotate(7deg) scale(1.02) translate3d(-1%, 3%, 0); opacity: 0.65; }
+  53% { transform: rotate(3deg) scale(1.14) translate3d(3%, -3%, 0); opacity: 0.84; }
+  100% { transform: rotate(7deg) scale(1.02) translate3d(-2%, 4%, 0); opacity: 0.64; }
 }
 
 @media (prefers-reduced-motion: reduce) {
