@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#080b0e">
+    <meta name="color-scheme" content="dark">
+    <title>Morphogenesis</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <main id="field" class="field" aria-label="Morphogenesis audiovisual instrument">
+      <div class="field__veil" aria-hidden="true"></div>
+
+      <button id="enter" class="enter" type="button">ENTRAR</button>
+
+      <p id="error" class="error" role="alert" hidden></p>
+
+      <section id="controls" class="controls" aria-label="Instrument controls" hidden>
+        <button id="mute" class="utility utility--mute" type="button" aria-pressed="false">
+          MUTE
+        </button>
+        <button id="debug-toggle" class="utility utility--debug" type="button" aria-expanded="false">
+          DIAG
+        </button>
+      </section>
+
+      <aside id="debug" class="debug" aria-live="polite" hidden>
+        <dl>
+          <div><dt>NOTE</dt><dd id="debug-note">—</dd></div>
+          <div><dt>FREQ</dt><dd id="debug-frequency">—</dd></div>
+          <div><dt>REGISTER</dt><dd id="debug-register">—</dd></div>
+          <div><dt>DETUNE</dt><dd id="debug-detune">—</dd></div>
+          <div><dt>AM RATE</dt><dd id="debug-modulation">—</dd></div>
+          <div><dt>AUDIO</dt><dd id="debug-state">—</dd></div>
+          <div><dt>VIEW</dt><dd id="debug-viewport">—</dd></div>
+          <div><dt>ELAPSED</dt><dd id="debug-elapsed">00:00</dd></div>
+          <div><dt>MODE</dt><dd id="debug-mode">—</dd></div>
+          <div class="debug__ua"><dt>AGENT</dt><dd id="debug-agent">—</dd></div>
+        </dl>
+      </aside>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
