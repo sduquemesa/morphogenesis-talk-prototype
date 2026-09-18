@@ -33,13 +33,14 @@
     note,
     role: Math.random() < 0.52 ? "bursts" : "merge",
     detune: between(-3.5, 3.5),
+    bodyOffset: between(-0.8, 0.8),
     pace: between(0.86, 1.17),
     throbHz: between(0.399, 0.401),
     noiseHz: between(520, 760),
     phase: between(-110, -3)
   };
   const ui = {
-    field: $("#field"), enter: $("#enter"), controls: $("#controls"),
+    field: $("#field"), touchPoint: $("#touch-point"), enter: $("#enter"), controls: $("#controls"),
     mute: $("#mute"), debugToggle: $("#debug-toggle"), debug: $("#debug"), error: $("#error")
   };
   const state = {
@@ -112,6 +113,7 @@
     const body = context.createOscillator();
     const toneLevel = context.createGain();
     const bodyLevel = context.createGain();
+    const gestureTone = context.createGain();
     const pluck = context.createGain();
     const drone = context.createGain();
     const throb = context.createOscillator();
@@ -132,8 +134,9 @@
     toneFilter.type = "lowpass"; toneFilter.frequency.value = 1320; toneFilter.Q.value = 0.42;
     tone.type = "triangle"; tone.frequency.value = note.hz; tone.detune.value = identity.detune;
     body.type = "sine"; body.frequency.value = note.hz;
-    body.detune.value = identity.detune + between(-0.8, 0.8);
+    body.detune.value = identity.detune + identity.bodyOffset;
     toneLevel.gain.value = 0.82; bodyLevel.gain.value = 0.20;
+    gestureTone.gain.value = 1;
     pluck.gain.value = 0; drone.gain.value = 0;
     throb.type = "sine"; throb.frequency.value = identity.throbHz;
     throbDepth.gain.value = 0; throbBase.gain.value = 0.52;
@@ -142,7 +145,8 @@
 
     tone.connect(toneLevel).connect(toneFilter);
     body.connect(bodyLevel).connect(toneFilter);
-    toneFilter.connect(pluck); toneFilter.connect(drone);
+    toneFilter.connect(gestureTone);
+    gestureTone.connect(pluck); gestureTone.connect(drone);
     throb.connect(throbDepth).connect(throbBase.gain);
     drone.connect(throbBase);
     pluck.connect(highpass); throbBase.connect(highpass);
@@ -153,7 +157,7 @@
     const waitForBeat = ((2500 - (Date.now() % 2500)) % 2500) / 1000;
     throb.start(context.currentTime + waitForBeat);
     state.sources.push(tone, body, throb);
-    return { master, toneFilter, pluck, drone, throbDepth, noiseFilter,
+    return { master, tone, body, toneFilter, gestureTone, pluck, drone, throbDepth, noiseFilter,
       noiseBuffer: createNoise(context) };
   }
 
@@ -209,7 +213,7 @@
   }
 
   function nextInterval(time) {
-    const steering = 1 + (state.gesture.y - 0.5) * 0.28;
+    const steering = 1 + (state.gesture.y - 0.5) * 0.7;
     if (time < 42) return between(4.2, 8.0) * identity.pace * steering;
     if (time < 98) return between(1.7, 3.8) * identity.pace * steering;
     return between(1.05, 1.75) * identity.pace * steering;
@@ -228,16 +232,20 @@
     }
 
     const g = state.gesture;
-    const smoothing = g.touching ? 0.16 : 0.035;
+    const smoothing = g.touching ? 0.4 : 0.035;
     g.x += (g.targetX - g.x) * smoothing;
     g.y += (g.targetY - g.y) * smoothing;
     if (g.touching || Math.abs(g.x - 0.5) > 0.005 || Math.abs(g.y - 0.5) > 0.005) {
       ui.field.style.setProperty("--touch-x", `${(g.x * 100).toFixed(1)}%`);
       ui.field.style.setProperty("--touch-y", `${(g.y * 100).toFixed(1)}%`);
     }
-    const filterShift = (g.x - 0.5) * 330;
-    approach(state.nodes.toneFilter.frequency, 1320 + filterShift, now, 0.3);
-    approach(state.nodes.noiseFilter.frequency, identity.noiseHz + filterShift * 0.55, now, 0.3);
+    const pitchBend = (g.x - 0.5) * 14;
+    approach(state.nodes.tone.detune, identity.detune + pitchBend, now, 0.18);
+    approach(state.nodes.body.detune, identity.detune + identity.bodyOffset + pitchBend, now, 0.18);
+    approach(state.nodes.toneFilter.frequency, 1320 + (g.x - 0.5) * 1300, now, 0.18);
+    approach(state.nodes.noiseFilter.frequency, identity.noiseHz * (0.72 + g.x * 0.56), now, 0.18);
+    approach(state.nodes.gestureTone.gain, 1 + (0.5 - g.y) * 0.5, now, 0.18);
+    approach(state.nodes.noiseFilter.Q, 1.15 + (g.y - 0.5) * 0.7, now, 0.18);
 
     let drone = 0;
     let throb = 0;
@@ -248,7 +256,7 @@
       drone = identity.role === "merge" ?
         0.085 + 0.007 * smooth(98, 106, time) :
         0.092 * smooth(97, 106, time);
-      throb = 0.38 + (g.y - 0.5) * 0.04;
+      throb = 0.38 + (g.y - 0.5) * 0.24;
     } else if (phase === "dissolve") {
       drone = 0.092 * (1 - smooth(145, 158, time));
       throb = 0.38;
@@ -316,6 +324,7 @@
 
   function finish() {
     if (state.finished) return;
+    releaseGesture();
     state.finished = true;
     state.phase = "silence";
     ui.field.dataset.score = "silence";
@@ -402,16 +411,24 @@
 
   function steer(event) {
     if (!state.active || event.target.closest("button, .debug")) return;
-    if (event.type === "pointerdown") state.gesture.touching = true;
+    if (event.type === "pointerdown") {
+      state.gesture.touching = true;
+      ui.field.classList.add("is-touching");
+    }
     if (event.type === "pointermove" && !state.gesture.touching) return;
-    state.gesture.targetX = clamp(event.clientX / innerWidth);
-    state.gesture.targetY = clamp(event.clientY / innerHeight);
+    const x = clamp(event.clientX / innerWidth);
+    const y = clamp(event.clientY / innerHeight);
+    state.gesture.targetX = x;
+    state.gesture.targetY = y;
+    ui.touchPoint.style.left = `${(x * 100).toFixed(2)}%`;
+    ui.touchPoint.style.top = `${(y * 100).toFixed(2)}%`;
   }
 
   function releaseGesture() {
     state.gesture.touching = false;
     state.gesture.targetX = 0.5;
     state.gesture.targetY = 0.5;
+    ui.field.classList.remove("is-touching");
   }
 
   ui.field.style.setProperty("--hue", String(note.hue));
@@ -436,7 +453,7 @@
   window.addEventListener("blur", releaseGesture);
   document.addEventListener("visibilitychange", () => {
     if (!state.context || state.finished) return;
-    if (document.hidden) { state.context.suspend().catch(() => {}); return; }
+    if (document.hidden) { releaseGesture(); state.context.suspend().catch(() => {}); return; }
     const result = state.context.resume();
     if (result && typeof result.catch === "function") result.catch(() => {});
   });

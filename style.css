@@ -117,6 +117,32 @@ button {
   opacity: 0.18;
 }
 
+.field.is-active.is-touching .field__gesture {
+  opacity: 0.55;
+  transition-duration: 0.18s;
+}
+
+.touch-point {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  background: hsl(var(--hue) 28% 88% / 0.9);
+  box-shadow: 0 0 0 13px hsl(var(--hue) 48% 56% / 0.09), 0 0 25px hsl(var(--hue) 52% 65% / 0.42);
+  transform: translate3d(-50%, -50%, 0);
+  transition: opacity 1.1s ease;
+}
+
+.field.is-touching .touch-point {
+  opacity: 0.9;
+  transition-duration: 0.12s;
+}
+
 .field[data-score="divergence"]::before,
 .field[data-score="throb"]::before {
   opacity: 0.84;
@@ -131,7 +157,8 @@ button {
 .field[data-score="silence"]::before,
 .field[data-score="silence"]::after,
 .field[data-score="silence"] .field__veil,
-.field[data-score="silence"] .field__gesture {
+.field[data-score="silence"] .field__gesture,
+.field[data-score="silence"] .touch-point {
   opacity: 0;
   animation: none;
   transition-duration: 1.5s;
