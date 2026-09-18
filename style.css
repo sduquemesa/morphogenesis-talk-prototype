@@ -44,6 +44,7 @@ button {
   inset: 0;
   min-height: 100svh;
   overflow: hidden;
+  touch-action: none;
   background:
     radial-gradient(circle at var(--field-x) var(--field-y), hsl(var(--hue) 24% var(--light) / 0.22), transparent 48%),
     linear-gradient(145deg, #090c0e 0%, #050708 48%, #0a0c0e 100%);
@@ -51,12 +52,14 @@ button {
 
 .field::before,
 .field::after,
-.field__veil {
+.field__veil,
+.field__gesture {
   position: absolute;
   z-index: -1;
   content: "";
   pointer-events: none;
   will-change: transform, opacity;
+  transition: opacity 12s ease;
 }
 
 .field::before {
@@ -88,6 +91,13 @@ button {
   transform: rotate(-4deg) scale(1.05);
 }
 
+.field__gesture {
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(circle at var(--touch-x, 50%) var(--touch-y, 50%), hsl(var(--hue) 42% 40% / 0.20), transparent 38%);
+  transition: opacity 2.5s ease;
+}
+
 .field.is-active::before {
   opacity: 0.78;
   animation: drift-a 83s ease-in-out var(--phase) infinite alternate;
@@ -101,6 +111,30 @@ button {
 .field.is-active .field__veil {
   opacity: 0.8;
   animation: breathe 61s ease-in-out var(--phase-veil) infinite alternate;
+}
+
+.field.is-active .field__gesture {
+  opacity: 0.18;
+}
+
+.field[data-score="divergence"]::before,
+.field[data-score="throb"]::before {
+  opacity: 0.84;
+}
+
+.field[data-score="dissolve"]::before,
+.field[data-score="dissolve"]::after,
+.field[data-score="dissolve"] .field__veil {
+  opacity: 0.30;
+}
+
+.field[data-score="silence"]::before,
+.field[data-score="silence"]::after,
+.field[data-score="silence"] .field__veil,
+.field[data-score="silence"] .field__gesture {
+  opacity: 0;
+  animation: none;
+  transition-duration: 1.5s;
 }
 
 .enter {
@@ -257,9 +291,9 @@ button {
 }
 
 @keyframes breathe {
-  0% { transform: rotate(-4deg) scale(1.05) translate3d(-2%, 1%, 0); opacity: 0.58; }
-  53% { transform: rotate(3deg) scale(1.14) translate3d(3%, -3%, 0); opacity: 0.84; }
-  100% { transform: rotate(7deg) scale(1.02) translate3d(-2%, 4%, 0); opacity: 0.64; }
+  0% { transform: rotate(-4deg) scale(1.05) translate3d(-2%, 1%, 0); }
+  53% { transform: rotate(3deg) scale(1.14) translate3d(3%, -3%, 0); }
+  100% { transform: rotate(7deg) scale(1.02) translate3d(-2%, 4%, 0); }
 }
 
 @media (prefers-reduced-motion: reduce) {

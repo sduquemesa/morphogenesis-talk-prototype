@@ -6,11 +6,12 @@
     <meta name="theme-color" content="#080b0e">
     <meta name="color-scheme" content="dark">
     <title>Morphogenesis</title>
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=4">
   </head>
   <body>
     <main id="field" class="field" aria-label="Morphogenesis audiovisual instrument">
       <div class="field__veil" aria-hidden="true"></div>
+      <div class="field__gesture" aria-hidden="true"></div>
 
       <button id="enter" class="enter" type="button">ENTRAR</button>
 
@@ -25,13 +26,13 @@
         </button>
       </section>
 
-      <aside id="debug" class="debug" aria-live="polite" hidden>
+      <aside id="debug" class="debug" hidden>
         <dl>
           <div><dt>NOTE</dt><dd id="debug-note">—</dd></div>
           <div><dt>FREQ</dt><dd id="debug-frequency">—</dd></div>
           <div><dt>REGISTER</dt><dd id="debug-register">—</dd></div>
           <div><dt>WAVE</dt><dd id="debug-waveform">—</dd></div>
-          <div><dt>WIDTH</dt><dd id="debug-width">—</dd></div>
+          <div><dt>RESONATOR</dt><dd id="debug-resonator">—</dd></div>
           <div><dt>FILTER</dt><dd id="debug-filter">—</dd></div>
           <div><dt>SESSION</dt><dd id="debug-session">—</dd></div>
           <div><dt>DETUNE</dt><dd id="debug-detune">—</dd></div>
@@ -40,11 +41,14 @@
           <div><dt>VIEW</dt><dd id="debug-viewport">—</dd></div>
           <div><dt>ELAPSED</dt><dd id="debug-elapsed">00:00</dd></div>
           <div><dt>MODE</dt><dd id="debug-mode">—</dd></div>
+          <div><dt>PHASE</dt><dd id="debug-phase">—</dd></div>
+          <div><dt>ROLE</dt><dd id="debug-role">—</dd></div>
+          <div><dt>XY</dt><dd id="debug-xy">—</dd></div>
           <div class="debug__ua"><dt>AGENT</dt><dd id="debug-agent">—</dd></div>
         </dl>
       </aside>
     </main>
 
-    <script src="script.js?v=3"></script>
+    <script src="performance.js?v=1"></script>
   </body>
 </html>
