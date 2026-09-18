@@ -33,8 +33,8 @@
     role: Math.random() < 0.52 ? "bursts" : "merge",
     detune: between(-3.5, 3.5),
     pace: between(0.86, 1.17),
-    throbHz: between(0.34, 0.52),
-    noiseHz: between(590, 920),
+    throbHz: between(0.399, 0.401),
+    noiseHz: between(520, 760),
     phase: between(-110, -3)
   };
   const ui = {
@@ -119,7 +119,7 @@
 
     master.gain.value = 0;
     highpass.type = "highpass"; highpass.frequency.value = 175; highpass.Q.value = 0.55;
-    lowpass.type = "lowpass"; lowpass.frequency.value = 2250; lowpass.Q.value = 0.5;
+    lowpass.type = "lowpass"; lowpass.frequency.value = 1950; lowpass.Q.value = 0.5;
     toneFilter.type = "lowpass"; toneFilter.frequency.value = 1320; toneFilter.Q.value = 0.42;
     tone.type = "triangle"; tone.frequency.value = note.hz; tone.detune.value = identity.detune;
     body.type = "sine"; body.frequency.value = note.hz;
@@ -127,7 +127,7 @@
     toneLevel.gain.value = 0.82; bodyLevel.gain.value = 0.20;
     pluck.gain.value = 0; drone.gain.value = 0;
     throb.type = "sine"; throb.frequency.value = identity.throbHz;
-    throbDepth.gain.value = 0; throbBase.gain.value = 0.58;
+    throbDepth.gain.value = 0; throbBase.gain.value = 0.52;
     noiseFilter.type = "bandpass"; noiseFilter.frequency.value = identity.noiseHz;
     noiseFilter.Q.value = 1.15; noiseLevel.gain.value = 0.72;
 
@@ -139,7 +139,10 @@
     pluck.connect(highpass); throbBase.connect(highpass);
     noiseFilter.connect(noiseLevel).connect(highpass);
     highpass.connect(lowpass).connect(master).connect(context.destination);
-    tone.start(); body.start(); throb.start();
+    tone.start(); body.start();
+    // Only the drone swell shares a loose wall-clock phase; entrances and swarms stay independent.
+    const waitForBeat = ((2500 - (Date.now() % 2500)) % 2500) / 1000;
+    throb.start(context.currentTime + waitForBeat);
     state.sources.push(tone, body, throb);
     return { master, toneFilter, pluck, drone, throbDepth, noiseFilter,
       noiseBuffer: createNoise(context) };
@@ -200,7 +203,7 @@
     const steering = 1 + (state.gesture.y - 0.5) * 0.28;
     if (time < 42) return between(4.2, 8.0) * identity.pace * steering;
     if (time < 98) return between(1.7, 3.8) * identity.pace * steering;
-    return between(0.28, 0.80) * identity.pace * steering;
+    return between(1.05, 1.75) * identity.pace * steering;
   }
 
   function tick() {
@@ -236,10 +239,10 @@
       drone = identity.role === "merge" ?
         0.085 + 0.007 * smooth(98, 106, time) :
         0.092 * smooth(97, 106, time);
-      throb = 0.32 + (g.y - 0.5) * 0.10;
+      throb = 0.38 + (g.y - 0.5) * 0.04;
     } else if (phase === "dissolve") {
       drone = 0.092 * (1 - smooth(145, 158, time));
-      throb = 0.32;
+      throb = 0.38;
     }
     approach(state.nodes.drone.gain, drone, now, 0.3);
     approach(state.nodes.throbDepth.gain, throb, now, 0.3);
@@ -261,7 +264,7 @@
       while (state.nextBurst <= now + 0.12 && emitted < 2) {
         const at = Math.max(now, state.nextBurst);
         const fade = 1 - smooth(164, LENGTH, time);
-        burst(at, 0.080 * fade, between(0.10, 0.24));
+        burst(at, 0.070 * fade, between(0.10, 0.18));
         state.nextBurst = at + nextInterval(time);
         emitted += 1;
       }
@@ -372,7 +375,7 @@
       register: note.name.endsWith("3") ? "low-mid" : "mid",
       waveform: "triangle + sine",
       resonator: `${identity.noiseHz.toFixed(0)} Hz`,
-      filter: "175–2250 Hz, soft",
+      filter: "175–1950 Hz, soft",
       session: state.session,
       detune: `${identity.detune.toFixed(2)} cents`,
       modulation: `${identity.throbHz.toFixed(3)} Hz`,
