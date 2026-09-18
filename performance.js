@@ -3,6 +3,7 @@
 
   const Context = window.AudioContext || window.webkitAudioContext;
   const LENGTH = 180;
+  const OUTPUT_GAIN = 6;
   const $ = (selector) => document.querySelector(selector);
   const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
   const between = (a, b) => a + Math.random() * (b - a);
@@ -102,6 +103,8 @@
 
   function createAudio(context) {
     const master = context.createGain();
+    const peakGuard = context.createDynamicsCompressor();
+    const output = context.createGain();
     const highpass = context.createBiquadFilter();
     const lowpass = context.createBiquadFilter();
     const toneFilter = context.createBiquadFilter();
@@ -118,6 +121,12 @@
     const noiseLevel = context.createGain();
 
     master.gain.value = 0;
+    peakGuard.threshold.value = -6;
+    peakGuard.knee.value = 3;
+    peakGuard.ratio.value = 16;
+    peakGuard.attack.value = 0.003;
+    peakGuard.release.value = 0.16;
+    output.gain.value = 0.9;
     highpass.type = "highpass"; highpass.frequency.value = 175; highpass.Q.value = 0.55;
     lowpass.type = "lowpass"; lowpass.frequency.value = 1950; lowpass.Q.value = 0.5;
     toneFilter.type = "lowpass"; toneFilter.frequency.value = 1320; toneFilter.Q.value = 0.42;
@@ -129,7 +138,7 @@
     throb.type = "sine"; throb.frequency.value = identity.throbHz;
     throbDepth.gain.value = 0; throbBase.gain.value = 0.52;
     noiseFilter.type = "bandpass"; noiseFilter.frequency.value = identity.noiseHz;
-    noiseFilter.Q.value = 1.15; noiseLevel.gain.value = 0.72;
+    noiseFilter.Q.value = 1.15; noiseLevel.gain.value = 1;
 
     tone.connect(toneLevel).connect(toneFilter);
     body.connect(bodyLevel).connect(toneFilter);
@@ -138,7 +147,7 @@
     drone.connect(throbBase);
     pluck.connect(highpass); throbBase.connect(highpass);
     noiseFilter.connect(noiseLevel).connect(highpass);
-    highpass.connect(lowpass).connect(master).connect(context.destination);
+    highpass.connect(lowpass).connect(master).connect(peakGuard).connect(output).connect(context.destination);
     tone.start(); body.start();
     // Only the drone swell shares a loose wall-clock phase; entrances and swarms stay independent.
     const waitForBeat = ((2500 - (Date.now() % 2500)) % 2500) / 1000;
@@ -254,7 +263,7 @@
         const at = Math.max(now, state.nextPluck);
         pluck(at, split ? 0.078 : 0.105,
           split ? between(0.35, 0.78) : between(5.5, 9.0), split ? 0.009 : 0.016);
-        if (split && Math.random() < 0.32) burst(at + 0.03, 0.050, 0.17);
+        if (split && Math.random() < 0.32) burst(at + 0.03, 0.12, 0.17);
         state.nextPluck = at + nextInterval(time);
         emitted += 1;
       }
@@ -263,8 +272,8 @@
       let emitted = 0;
       while (state.nextBurst <= now + 0.12 && emitted < 2) {
         const at = Math.max(now, state.nextBurst);
-        const fade = 1 - smooth(164, LENGTH, time);
-        burst(at, 0.070 * fade, between(0.10, 0.18));
+        const fade = 1 - smooth(170, LENGTH, time);
+        burst(at, 0.24 * fade, between(0.10, 0.18));
         state.nextBurst = at + nextInterval(time);
         emitted += 1;
       }
@@ -345,7 +354,7 @@
       ui.field.classList.add("is-active");
       ui.field.dataset.score = "emergence";
       state.nodes.master.gain.setValueAtTime(0, now);
-      state.nodes.master.gain.linearRampToValueAtTime(0.72, now + 0.18);
+      state.nodes.master.gain.linearRampToValueAtTime(OUTPUT_GAIN, now + 0.18);
       tick();
       state.timer = setInterval(tick, 80);
       updateDebug();
@@ -362,7 +371,7 @@
       if (result && typeof result.catch === "function") result.catch(() => {});
     }
     state.muted = !state.muted;
-    approach(state.nodes.master.gain, state.muted ? 0 : 0.72, state.context.currentTime, 0.16);
+    approach(state.nodes.master.gain, state.muted ? 0 : OUTPUT_GAIN, state.context.currentTime, 0.16);
     ui.mute.textContent = state.muted ? "UNMUTE" : "MUTE";
     ui.mute.setAttribute("aria-pressed", String(state.muted));
   }
