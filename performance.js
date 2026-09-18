@@ -127,7 +127,7 @@
     toneLevel.gain.value = 0.82; bodyLevel.gain.value = 0.20;
     pluck.gain.value = 0; drone.gain.value = 0;
     throb.type = "sine"; throb.frequency.value = identity.throbHz;
-    throbDepth.gain.value = 0; throbBase.gain.value = 0.62;
+    throbDepth.gain.value = 0; throbBase.gain.value = 0.58;
     noiseFilter.type = "bandpass"; noiseFilter.frequency.value = identity.noiseHz;
     noiseFilter.Q.value = 1.15; noiseLevel.gain.value = 0.72;
 
@@ -236,10 +236,10 @@
       drone = identity.role === "merge" ?
         0.085 + 0.007 * smooth(98, 106, time) :
         0.092 * smooth(97, 106, time);
-      throb = 0.24 + (g.y - 0.5) * 0.10;
+      throb = 0.32 + (g.y - 0.5) * 0.10;
     } else if (phase === "dissolve") {
       drone = 0.092 * (1 - smooth(145, 158, time));
-      throb = 0.25;
+      throb = 0.32;
     }
     approach(state.nodes.drone.gain, drone, now, 0.3);
     approach(state.nodes.throbDepth.gain, throb, now, 0.3);
